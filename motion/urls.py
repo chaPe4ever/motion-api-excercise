@@ -7,10 +7,10 @@ from rest_framework_simplejwt import views as jwt_views
 
 schema_view = get_schema_view(
     openapi.Info(
-        title="Recipe Cookbook Management API",
+        title="Motion API",
         default_version="v1",
         description="""
-API documentation for Recipe Cookbook Management System
+API documentation for Motion
 
 ## Authentication
 This API uses JWT (JSON Web Token) authentication.
@@ -27,7 +27,7 @@ That's it! The token will be automatically added to all requests.
 `Authorization: Bearer YOUR_TOKEN`
         """,
         terms_of_service="https://www.google.com/policies/terms/",
-        contact=openapi.Contact(email="contact@recipecookbook.local"),
+        contact=openapi.Contact(email="contact@motion.local"),
         license=openapi.License(name="BSD License"),
     ),
     public=True,
@@ -42,6 +42,8 @@ urlpatterns = [
         jwt_views.TokenObtainPairView.as_view(),
         name="token_obtain_pair",
     ),
+    path("backend/api/followers/", include("follow.urls")),
+    path("backend/api/posts/", include("post.urls")),
     # Swagger documentation URLs
     re_path(
         r"^swagger(?P<format>\.json|\.yaml)$",

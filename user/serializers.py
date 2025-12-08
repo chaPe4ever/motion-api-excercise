@@ -18,7 +18,7 @@ class UserSerializer(ModelSerializer):
             "email",
             "first_name",
             "last_name",
-            "created",
+            "profile",
         ]
         read_only_fields = ["id", "created"]
         ref_name = "User"

@@ -5,12 +5,14 @@ from django.db import models
 
 
 class UserProfile(models.Model):
-    user = models.OneToOneField(to=settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    job = models.CharField(blank=True, null=True, max_length=255)
-    avatar = models.CharField(blank=True, null=True, max_length=255)
-    location = models.CharField(blank=True, null=True, max_length=255)
-    phone_number = models.CharField(blank=True, null=True, max_length=50)
-    about_me = models.CharField(blank=True, null=True, max_length=1024)
+    user = models.OneToOneField(
+        to=settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profile"
+    )
+    job = models.CharField(blank=True, max_length=100, default="")
+    avatar = models.URLField(blank=True, default="")
+    location = models.CharField(blank=True, max_length=100, default="")
+    phone_number = models.CharField(blank=True, max_length=30, default="")
+    about_me = models.TextField(blank=True, default="")
     user_hashtags = models.JSONField(default=list, blank=True)
     updated = models.DateTimeField(auto_now=True)
 

@@ -54,8 +54,12 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     # Owned apps
+    "motion",
     "user",
     "user_profile",
+    "follow",
+    "post",
+    "image",
     # Third party apps
     "rest_framework",
     "drf_yasg",

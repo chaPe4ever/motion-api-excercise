@@ -1,5 +1,5 @@
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from motion.permissions import IsAdmin, IsOwnerOrAdmin
 from user.models import User
@@ -24,7 +24,7 @@ class ListCreateUserView(ListCreateAPIView):
         """Allow public registration but require admin for listing"""
         if self.request.method == "POST":
             return [AllowAny()]
-        return [IsAdmin()]
+        return [IsAuthenticated()]
 
 
 class RetrieveUpdateDestroyUserView(RetrieveUpdateDestroyAPIView):
@@ -39,6 +39,6 @@ class RetrieveUpdateDestroyUserView(RetrieveUpdateDestroyAPIView):
 
     def get_permissions(self):
         """Everyone can view, only owner can update/delete"""
-        if self.request.method == "GET":
-            return [AllowAny()]
+        # if self.request.method == "GET":
+        #     return [AllowAny()]
         return [IsOwnerOrAdmin()]
