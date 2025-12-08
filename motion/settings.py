@@ -109,6 +109,22 @@ if _database_url:
         # Configure SSL for PostgreSQL connections
         options: Dict[str, Any] = db_config.get("OPTIONS", {}) or {}
         options["sslmode"] = "require"
+
+        # Use PostgreSQL schema to isolate this project's tables when sharing a database
+        # Set DB_SCHEMA environment variable (default: "motion")
+        # This allows multiple Django projects to share the same PostgreSQL database
+        db_schema = config("DB_SCHEMA", default="motion")
+        if db_schema:
+            # Set search_path to use the schema for all queries
+            # This ensures all tables are created and accessed in the specified schema
+            # Format: "-c option=value" for PostgreSQL connection options
+            existing_options = options.get("options", "")
+            search_path_option = f"-c search_path={db_schema},public"
+            if existing_options:
+                options["options"] = f"{existing_options} {search_path_option}"
+            else:
+                options["options"] = search_path_option
+
         db_config["OPTIONS"] = options
     DATABASES = {"default": db_config}
 else:
