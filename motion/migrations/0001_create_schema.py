@@ -8,15 +8,14 @@ def create_schema(apps, schema_editor):
     """
     Create PostgreSQL schema if it doesn't exist.
     This allows multiple Django projects to share the same database.
-    Sets the search_path for this connection to ensure tables are created in the correct schema.
+    Note: search_path is set via database connection options in settings.py,
+    so we only need to create the schema here.
     """
     db_schema = config("DB_SCHEMA", default="test")
     if db_schema and schema_editor.connection.vendor == "postgresql":
         with schema_editor.connection.cursor() as cursor:
             # Create schema if it doesn't exist
             cursor.execute(f'CREATE SCHEMA IF NOT EXISTS "{db_schema}";')
-            # Set search_path for this connection to ensure Django creates tables in the correct schema
-            cursor.execute(f'SET search_path TO "{db_schema}", public;')
 
 
 def drop_schema(apps, schema_editor):
