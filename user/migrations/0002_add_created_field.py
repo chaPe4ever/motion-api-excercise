@@ -9,14 +9,35 @@ def add_created_field(apps, schema_editor):
     Add the 'created' field if it doesn't exist.
     This handles the case where the database schema is out of sync,
     especially when sharing a database with other projects.
+
+    This migration adds the column to ALL schemas where the table exists,
+    since we're sharing a database and users might exist in different schemas.
     """
     db_schema = config("DB_SCHEMA", default="motion")
 
     if schema_editor.connection.vendor == "postgresql":
         with schema_editor.connection.cursor() as cursor:
-            # Check if column exists in the current schema (motion) or public schema
-            # First check motion schema, then public schema
+            # Check all schemas where the table might exist
+            # We need to add the column to ALL schemas that have the table
             for schema_name in [db_schema, "public"]:
+                # Check if table exists in this schema
+                cursor.execute(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1 FROM information_schema.tables 
+                        WHERE table_schema = %s 
+                        AND table_name = 'user_user'
+                    );
+                """,
+                    [schema_name],
+                )
+
+                table_exists = cursor.fetchone()[0]
+
+                if not table_exists:
+                    continue
+
+                # Check if column already exists
                 cursor.execute(
                     """
                     SELECT EXISTS (
@@ -32,26 +53,12 @@ def add_created_field(apps, schema_editor):
                 column_exists = cursor.fetchone()[0]
 
                 if column_exists:
-                    # Column already exists in this schema, skip
-                    return
+                    # Column already exists in this schema, skip this schema
+                    continue
 
-                # Check if table exists in this schema
-                cursor.execute(
-                    """
-                    SELECT EXISTS (
-                        SELECT 1 FROM information_schema.tables 
-                        WHERE table_schema = %s 
-                        AND table_name = 'user_user'
-                    );
-                """,
-                    [schema_name],
-                )
-
-                table_exists = cursor.fetchone()[0]
-
-                if table_exists:
-                    # Table exists in this schema, add column
-                    # Use schema-qualified table name
+                # Table exists but column doesn't - add it
+                # Use schema-qualified table name
+                try:
                     cursor.execute(f"""
                         ALTER TABLE "{schema_name}".user_user 
                         ADD COLUMN IF NOT EXISTS created TIMESTAMP WITH TIME ZONE;
@@ -70,7 +77,13 @@ def add_created_field(apps, schema_editor):
                         ALTER COLUMN created SET DEFAULT CURRENT_TIMESTAMP,
                         ALTER COLUMN created SET NOT NULL;
                     """)
-                    return
+                except Exception as e:
+                    # Log error but continue with other schemas
+                    # This allows the migration to complete even if one schema fails
+                    print(
+                        f"Warning: Could not add 'created' column to {schema_name}.user_user: {e}"
+                    )
+                    continue
 
 
 def remove_created_field(apps, schema_editor):
