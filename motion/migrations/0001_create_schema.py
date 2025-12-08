@@ -9,7 +9,7 @@ def create_schema(apps, schema_editor):
     Create PostgreSQL schema if it doesn't exist.
     This allows multiple Django projects to share the same database.
     """
-    db_schema = config("DB_SCHEMA", default="motion")
+    db_schema = config("DB_SCHEMA", default="test")
     if db_schema and schema_editor.connection.vendor == "postgresql":
         with schema_editor.connection.cursor() as cursor:
             # Create schema if it doesn't exist
@@ -21,7 +21,7 @@ def drop_schema(apps, schema_editor):
     Drop PostgreSQL schema (reverse migration).
     WARNING: This will drop all tables in the schema!
     """
-    db_schema = config("DB_SCHEMA", default="motion")
+    db_schema = config("DB_SCHEMA", default="test")
     if db_schema and schema_editor.connection.vendor == "postgresql":
         with schema_editor.connection.cursor() as cursor:
             cursor.execute(f'DROP SCHEMA IF EXISTS "{db_schema}" CASCADE;')
