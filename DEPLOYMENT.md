@@ -28,13 +28,13 @@ python-3.13.0
 
 #### 1.3 Create `Procfile`
 ```txt
-web: gunicorn recipe_cookbok_management.wsgi:application
+web: gunicorn motion.wsgi:application
 release: python manage.py migrate
 ```
 
 #### 1.4 Update `settings.py` for Production
 
-Create `recipe_cookbok_management/settings.py` with environment-based configuration:
+Create `motion/settings.py` with environment-based configuration:
 
 ```python
 import os
@@ -88,13 +88,12 @@ MIDDLEWARE = [
 1. Go to Render Dashboard
 2. Click "New +" → "PostgreSQL"
 3. Choose:
-   - Name: `recipe-cookbook-db`
-   - Database: `recipe_cookbook`
-   - User: `recipe_user`
+   - Name: `motion-excercise-db`
+   - Database: `motion_excercise`
+   - User: `motion_excercise_user`
    - Region: Choose closest
    - Plan: Free (for testing)
-4. Click "Create Database"
-5. **Save the connection string** (you'll need it)
+
 
 ### Step 3: Deploy Django Application
 
@@ -102,11 +101,13 @@ MIDDLEWARE = [
 2. Click "New +" → "Web Service"
 3. Connect your Git repository
 4. Configure:
-   - **Name**: `recipe-cookbook-api`
+   - **Name**: `motion-excercise-api`
    - **Environment**: Python 3
    - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn recipe_cookbok_management.wsgi:application`
+   - **Start Command**: `gunicorn motion.wsgi:application`
    - **Plan**: Free (for testing)
+5. Click "Create Database"
+6. **Save the connection string** (you'll need it)
 
 ### Step 4: Configure Environment Variables
 
