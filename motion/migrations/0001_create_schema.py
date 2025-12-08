@@ -8,12 +8,23 @@ def create_schema(apps, schema_editor):
     """
     Create PostgreSQL schema if it doesn't exist.
     This allows multiple Django projects to share the same database.
+    Also creates django_migrations table in the schema for migration tracking.
     """
     db_schema = config("DB_SCHEMA", default="test")
     if db_schema and schema_editor.connection.vendor == "postgresql":
         with schema_editor.connection.cursor() as cursor:
             # Create schema if it doesn't exist
             cursor.execute(f'CREATE SCHEMA IF NOT EXISTS "{db_schema}";')
+            # Create django_migrations table in the schema if it doesn't exist
+            # This ensures Django can track migrations in the correct schema
+            cursor.execute(f'''
+                CREATE TABLE IF NOT EXISTS "{db_schema}"."django_migrations" (
+                    id BIGSERIAL NOT NULL PRIMARY KEY,
+                    app VARCHAR(255) NOT NULL,
+                    name VARCHAR(255) NOT NULL,
+                    applied TIMESTAMPTZ NOT NULL
+                );
+            ''')
 
 
 def drop_schema(apps, schema_editor):
