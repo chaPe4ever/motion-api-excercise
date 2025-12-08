@@ -5,7 +5,7 @@
 -r requirements.txt
 
 # Production-specific packages
-psycopg2-binary==2.9.9  # PostgreSQL adapter for Django
+psycopg[binary]==3.2.3  # PostgreSQL adapter for Django (psycopg3 - Python 3.13 compatible)
 gunicorn==21.2.0  # WSGI HTTP Server for production
 whitenoise==6.6.0  # Static file serving
 python-decouple==3.8  # Environment variable management

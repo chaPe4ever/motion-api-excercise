@@ -15,7 +15,7 @@ Django==6.0
 djangorestframework==3.16.1
 djangorestframework-simplejwt==5.5.1
 drf-yasg==1.21.11
-psycopg2-binary==2.9.9  # PostgreSQL adapter
+psycopg[binary]==3.2.3  # PostgreSQL adapter (psycopg3 - Python 3.13 compatible)
 gunicorn==21.2.0  # WSGI server
 whitenoise==6.6.0  # Static file serving
 python-decouple==3.8  # Environment variables
@@ -245,7 +245,7 @@ Before going live:
 
 ```bash
 # Install production dependencies
-pip install psycopg2-binary gunicorn whitenoise python-decouple dj-database-url
+pip install "psycopg[binary]" gunicorn whitenoise python-decouple dj-database-url
 
 # Update requirements.txt
 pip freeze > requirements.txt
