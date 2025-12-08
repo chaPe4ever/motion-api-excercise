@@ -11,4 +11,5 @@ echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
 echo "Build complete!"
+echo "Note: Migrations will run automatically via the 'release' command in Procfile"
 
