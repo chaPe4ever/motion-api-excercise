@@ -111,9 +111,9 @@ if _database_url:
         options["sslmode"] = "require"
 
         # Use PostgreSQL schema to isolate this project's tables when sharing a database
-        # Set DB_SCHEMA environment variable (default: "motion")
+        # Set DB_SCHEMA environment variable (default: "test")
         # This allows multiple Django projects to share the same PostgreSQL database
-        db_schema = config("DB_SCHEMA", default="motion")
+        db_schema = config("DB_SCHEMA", default="test")
         if db_schema:
             # Set search_path to use the schema for all queries
             # This ensures all tables are created and accessed in the specified schema
