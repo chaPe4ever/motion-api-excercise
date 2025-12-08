@@ -4,6 +4,7 @@ from rest_framework.serializers import ModelSerializer
 from image.models import Image
 from image.serializers import ImageSerializer
 from post.models import Post
+from user_profile.models import UserProfile
 from user_profile.serializers import UserProfileSerializer
 
 
@@ -26,7 +27,9 @@ class PostSerializer(ModelSerializer):
 
     def create(self, validated_data):
         images_data = validated_data.pop("images", [])
-        user_profile = self.context["request"].user.profile
+        user = self.context["request"].user
+        # Ensure user has a profile, create one if it doesn't exist
+        user_profile, _ = UserProfile.objects.get_or_create(user=user)
 
         post = Post.objects.create(user=user_profile, **validated_data)
 
