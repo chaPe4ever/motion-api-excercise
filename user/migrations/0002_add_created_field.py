@@ -59,24 +59,30 @@ def add_created_field(apps, schema_editor):
                 # Table exists but column doesn't - add it
                 # Use schema-qualified table name
                 try:
-                    cursor.execute(f"""
+                    cursor.execute(
+                        f"""
                         ALTER TABLE "{schema_name}".user_user 
                         ADD COLUMN IF NOT EXISTS created TIMESTAMP WITH TIME ZONE;
-                    """)
+                    """
+                    )
 
                     # Set default for existing rows
-                    cursor.execute(f"""
+                    cursor.execute(
+                        f"""
                         UPDATE "{schema_name}".user_user 
                         SET created = COALESCE(date_joined, CURRENT_TIMESTAMP)
                         WHERE created IS NULL;
-                    """)
+                    """
+                    )
 
                     # Set NOT NULL constraint and default for future inserts
-                    cursor.execute(f"""
+                    cursor.execute(
+                        f"""
                         ALTER TABLE "{schema_name}".user_user 
                         ALTER COLUMN created SET DEFAULT CURRENT_TIMESTAMP,
                         ALTER COLUMN created SET NOT NULL;
-                    """)
+                    """
+                    )
                 except Exception as e:
                     # Log error but continue with other schemas
                     # This allows the migration to complete even if one schema fails
@@ -96,10 +102,12 @@ def remove_created_field(apps, schema_editor):
         with schema_editor.connection.cursor() as cursor:
             # Try to drop from motion schema first, then public
             for schema_name in [db_schema, "public"]:
-                cursor.execute(f"""
+                cursor.execute(
+                    f"""
                     ALTER TABLE "{schema_name}".user_user 
                     DROP COLUMN IF EXISTS created;
-                """)
+                """
+                )
 
 
 class Migration(migrations.Migration):

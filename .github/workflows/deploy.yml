@@ -1,0 +1,126 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-backend:
+    name: Build Backend Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set repository name to lowercase
+        id: set-repo
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "repo_lower=$REPO_LOWER" >> $GITHUB_OUTPUT
+          echo "BACKEND_IMAGE=$REPO_LOWER/backend" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./motion-api-excercise
+          file: ./motion-api-excercise/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.set-repo.outputs.repo_lower }}/backend:${{ env.IMAGE_TAG }}
+            ${{ env.REGISTRY }}/${{ steps.set-repo.outputs.repo_lower }}/backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to Server
+    needs: build-backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set repository name to lowercase
+        id: set-repo
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "repo_lower=$REPO_LOWER" >> $GITHUB_OUTPUT
+          echo "BACKEND_IMAGE=${{ env.REGISTRY }}/$REPO_LOWER/backend:${{ env.IMAGE_TAG }}" >> $GITHUB_ENV
+
+      - name: Copy files to server
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "mkdir -p ${{ secrets.PROJECT_DIR }}/nginx/sites-available ${{ secrets.PROJECT_DIR }}/scripts"
+          scp motion-api-excercise/docker-compose.prod.yml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.PROJECT_DIR }}/
+          scp motion-api-excercise/scripts/*.sh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.PROJECT_DIR }}/scripts/ || true
+          scp motion-api-excercise/nginx/sites-available/* ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.PROJECT_DIR }}/nginx/sites-available/ || true
+
+      - name: Deploy to server
+        env:
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          PROJECT_DIR: ${{ secrets.PROJECT_DIR }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          REGISTRY: ${{ env.REGISTRY }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} bash << 'ENDSSH'
+            set -e
+            
+            export BACKEND_IMAGE="${{ env.BACKEND_IMAGE }}"
+            export PROJECT_DIR="${{ secrets.PROJECT_DIR }}"
+            export GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+            export GITHUB_ACTOR="${{ github.actor }}"
+            export REGISTRY="${{ env.REGISTRY }}"
+            export SECRET_KEY="${{ secrets.SECRET_KEY }}"
+            export ALLOWED_HOSTS="${{ secrets.ALLOWED_HOSTS }}"
+            export POSTGRES_DB="${{ secrets.POSTGRES_DB }}"
+            export POSTGRES_USER="${{ secrets.POSTGRES_USER }}"
+            export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
+            
+            # Verify critical environment variables
+            MISSING_VARS=""
+            [ -z "$BACKEND_IMAGE" ] && MISSING_VARS="$MISSING_VARS BACKEND_IMAGE"
+            [ -z "$SECRET_KEY" ] && MISSING_VARS="$MISSING_VARS SECRET_KEY"
+            [ -z "$POSTGRES_DB" ] && MISSING_VARS="$MISSING_VARS POSTGRES_DB"
+            [ -z "$POSTGRES_USER" ] && MISSING_VARS="$MISSING_VARS POSTGRES_USER"
+            [ -z "$POSTGRES_PASSWORD" ] && MISSING_VARS="$MISSING_VARS POSTGRES_PASSWORD"
+            
+            if [ -n "$MISSING_VARS" ]; then
+              echo "❌ ERROR: Missing required environment variables:$MISSING_VARS"
+              exit 1
+            fi
+            
+            cd $PROJECT_DIR
+            
+            # Log in to GitHub Container Registry
+            echo "$GITHUB_TOKEN" | docker login $REGISTRY -u $GITHUB_ACTOR --password-stdin || {
+              echo "❌ Failed to login to container registry"
+              exit 1
+            }
+            
+            # Run deployment script
+            chmod +x scripts/deploy.sh
+            ./scripts/deploy.sh
+          ENDSSH
