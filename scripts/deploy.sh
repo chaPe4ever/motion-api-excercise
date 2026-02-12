@@ -101,65 +101,69 @@ else
   fi
 fi
 
-# Check SSL certificates status and handle setup/renewal
+# Set up host-level nginx FIRST (so port 80 is configured and certbot webroot can be served)
+echo "🔧 Setting up host-level nginx (required for SSL and routing)..."
+cd "$PROJECT_DIR"
+
+if [ -f "scripts/setup-host-nginx-auto.sh" ] && [ -d "nginx/sites-available" ]; then
+  export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-motion-api}"
+  # Create wrapper script to pass env vars (sudo doesn't preserve env by default)
+  cat > /tmp/nginx-setup-wrapper.sh << 'WRAPPER_EOF'
+#!/bin/bash
+export PROJECT_DIR="$1"
+export ALLOWED_HOSTS="$2"
+export COMPOSE_PROJECT_NAME="$3"
+bash "$PROJECT_DIR/scripts/setup-host-nginx-auto.sh"
+WRAPPER_EOF
+  chmod +x /tmp/nginx-setup-wrapper.sh
+  sudo /tmp/nginx-setup-wrapper.sh "$PROJECT_DIR" "$ALLOWED_HOSTS" "${COMPOSE_PROJECT_NAME:-motion-api}" || {
+    echo "⚠️  Host nginx setup failed."
+    echo "   Run one-time server setup: see SERVER_SETUP.md (sudo NOPASSWD for setup script)."
+  }
+  rm -f /tmp/nginx-setup-wrapper.sh
+else
+  echo "⚠️  setup-host-nginx-auto.sh or nginx templates not found"
+fi
+
+# Check SSL certificates status and handle setup/renewal (after host nginx is up)
 echo "🔒 Checking SSL certificates..."
 if [ "$SSL_CERTS_EXIST" = true ]; then
   echo "✅ SSL certificates found for $DOMAIN - renewing if needed..."
   docker compose -f docker-compose.prod.yml run --rm certbot renew --quiet 2>/dev/null || true
 else
   echo "⚠️  SSL certificates not found for $DOMAIN"
-  echo "🔐 Attempting automatic SSL certificate setup..."
-  
-  # Start backend for Let's Encrypt verification
-  echo "🚀 Starting backend for SSL certificate verification..."
-  docker compose -f docker-compose.prod.yml up -d backend || true
-  
-  # Wait for backend to be ready
-  sleep 5
-  
-  # Attempt to obtain SSL certificate
-  echo "📜 Requesting SSL certificate from Let's Encrypt..."
-  echo "   Domain: $DOMAIN"
-  echo "   Email: $SSL_EMAIL"
-  
+  echo "🔐 Attempting automatic SSL certificate setup (webroot via host nginx)..."
+
   if [[ ! "$SSL_EMAIL" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
     echo "⚠️  Invalid email format: $SSL_EMAIL"
     SSL_EMAIL="admin@${DOMAIN}"
     export SSL_EMAIL
   fi
-  
-  # Note: For motion-api, certbot needs access to port 80 for verification
-  # The host nginx should handle /.well-known/acme-challenge/ requests
-  # We'll use standalone mode or webroot mode depending on setup
-  if docker compose -f docker-compose.prod.yml run --rm certbot certonly --standalone \
-    -d $DOMAIN \
+
+  # Use webroot mode: host nginx serves .well-known from /var/www/html (created by setup-host-nginx)
+  if docker compose -f docker-compose.prod.yml run --rm -v /var/www/html:/var/www/certbot certbot certonly --webroot \
+    -w /var/www/certbot \
+    -d "$DOMAIN" \
     --email "$SSL_EMAIL" \
     --agree-tos \
-    --non-interactive \
-    --preferred-challenges http 2>&1; then
+    --non-interactive 2>&1; then
     echo "✅ SSL certificate obtained successfully!"
     SSL_CERTS_EXIST=true
+    # Re-run host nginx setup to copy certs and enable HTTPS
+    cat > /tmp/nginx-setup-wrapper.sh << 'WRAPPER_EOF'
+#!/bin/bash
+export PROJECT_DIR="$1"
+export ALLOWED_HOSTS="$2"
+export COMPOSE_PROJECT_NAME="$3"
+bash "$PROJECT_DIR/scripts/setup-host-nginx-auto.sh"
+WRAPPER_EOF
+    chmod +x /tmp/nginx-setup-wrapper.sh
+    sudo /tmp/nginx-setup-wrapper.sh "$PROJECT_DIR" "$ALLOWED_HOSTS" "${COMPOSE_PROJECT_NAME:-motion-api}" || true
+    rm -f /tmp/nginx-setup-wrapper.sh
   else
     echo "⚠️  SSL certificate setup failed or skipped"
-    echo "   Common reasons:"
-    echo "   1. Domain DNS not pointing to server yet"
-    echo "   2. Port 80 not accessible from internet"
-    echo "   3. DNS propagation delay"
-    echo "   The application will run over HTTP. You can manually set up SSL later."
+    echo "   Ensure host nginx is set up (see SERVER_SETUP.md) and port 80 is open."
   fi
-fi
-
-# Set up host-level nginx automatically (after SSL setup)
-echo "🔧 Setting up host-level nginx..."
-cd "$PROJECT_DIR"
-
-if [ -f "scripts/setup-host-nginx-auto.sh" ] && [ -d "nginx/sites-available" ]; then
-  export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-motion-api}"
-  sudo PROJECT_DIR="$PROJECT_DIR" ALLOWED_HOSTS="$ALLOWED_HOSTS" COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" bash scripts/setup-host-nginx-auto.sh || {
-    echo "⚠️  Host nginx setup failed, but continuing deployment..."
-  }
-else
-  echo "⚠️  setup-host-nginx-auto.sh or nginx templates not found"
 fi
 
 # Stop existing containers
@@ -189,6 +193,10 @@ echo "🔄 Running database migrations..."
 docker compose -f docker-compose.prod.yml exec -T backend python manage.py migrate --noinput || {
   echo "⚠️  Migrations failed, but continuing..."
 }
+
+# Ensure staticfiles is writable by app user (fixes PermissionError after volume creation)
+echo "📂 Fixing staticfiles permissions..."
+docker compose -f docker-compose.prod.yml run --rm -u root backend chown -R 1000:1000 /app/staticfiles 2>/dev/null || true
 
 # Collect static files
 echo "📦 Collecting static files..."

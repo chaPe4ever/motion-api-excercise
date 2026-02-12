@@ -33,6 +33,10 @@ fi
 mkdir -p /etc/nginx/sites-available
 mkdir -p /etc/nginx/sites-enabled
 
+# Let's Encrypt webroot (for certbot --webroot)
+mkdir -p /var/www/html
+chown -R www-data:www-data /var/www/html
+
 # Update nginx.conf to include sites-enabled if not already present
 if ! grep -q "include /etc/nginx/sites-enabled/\*;" /etc/nginx/nginx.conf; then
   sed -i '/^http {/a\    # Include server block configs\n    include /etc/nginx/sites-enabled/*;' /etc/nginx/nginx.conf
@@ -92,14 +96,20 @@ fi
 if [ -f "$TEMPLATE_DIR/motion-api" ]; then
   echo "📝 Processing motion-api server block template..."
   export ALLOWED_HOSTS_DOMAIN="$MOTION_API_DOMAIN"
-  envsubst '${ALLOWED_HOSTS_DOMAIN}' < "$TEMPLATE_DIR/motion-api" > /etc/nginx/sites-available/motion-api
+  envsubst '${ALLOWED_HOSTS_DOMAIN}' < "$TEMPLATE_DIR/motion-api" > /tmp/motion-api-nginx.conf
   
-  # If certificates exist, ensure SSL paths are correct
-  if [ "$SSL_CERTS_EXIST" = true ]; then
-    sed -i "s|ssl_certificate.*|ssl_certificate /etc/letsencrypt/live/$MOTION_API_DOMAIN/fullchain.pem;|g" /etc/nginx/sites-available/motion-api
-    sed -i "s|ssl_certificate_key.*|ssl_certificate_key /etc/letsencrypt/live/$MOTION_API_DOMAIN/privkey.pem;|g" /etc/nginx/sites-available/motion-api
+  # If certificates don't exist, remove the HTTPS server block
+  if [ "$SSL_CERTS_EXIST" != true ]; then
+    echo "⚠️  No SSL certificates - removing HTTPS server block"
+    # Remove the HTTPS server block (from "# HTTPS server" line to the closing "}")
+    sed -i '/^# HTTPS server/,/^}$/d' /tmp/motion-api-nginx.conf
+  else
+    # Certificates exist - ensure SSL paths are correct
+    sed -i "s|ssl_certificate.*|ssl_certificate /etc/letsencrypt/live/$MOTION_API_DOMAIN/fullchain.pem;|g" /tmp/motion-api-nginx.conf
+    sed -i "s|ssl_certificate_key.*|ssl_certificate_key /etc/letsencrypt/live/$MOTION_API_DOMAIN/privkey.pem;|g" /tmp/motion-api-nginx.conf
   fi
   
+  mv /tmp/motion-api-nginx.conf /etc/nginx/sites-available/motion-api
   ln -sf /etc/nginx/sites-available/motion-api /etc/nginx/sites-enabled/motion-api
   echo "✅ Created and enabled motion-api server block"
 else

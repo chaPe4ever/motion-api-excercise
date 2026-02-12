@@ -9,6 +9,25 @@ This guide explains how to configure GitHub Actions and secrets for automated de
 - Domain name pointing to your server's IP address
 - Docker installed on your server
 
+## One-Time Server Setup (Required)
+
+Before the first deployment (or if you see "sudo: a terminal is required" or "Host key verification failed"), run the one-time steps in **[SERVER_SETUP.md](./SERVER_SETUP.md)** on your server. In short:
+
+1. **Allow passwordless sudo for the nginx setup script** (so GitHub Actions can run it):
+   ```bash
+   sudo visudo
+   ```
+   Add (replace path with your actual `PROJECT_DIR`):
+   ```
+   runner ALL=(ALL) NOPASSWD: /bin/bash /home/runner/app/motion-api/scripts/setup-host-nginx-auto.sh
+   ```
+
+2. If collectstatic already failed once, fix volume permissions:
+   ```bash
+   cd $PROJECT_DIR
+   docker compose -f docker-compose.prod.yml run --rm -u root backend chown -R 1000:1000 /app/staticfiles
+   ```
+
 ## Step 1: Configure GitHub Secrets
 
 Go to your GitHub repository → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
