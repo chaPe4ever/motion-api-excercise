@@ -163,8 +163,9 @@ Use different `PROJECT_DIR` for each project:
    - Review error messages
 
 2. **Common issues**:
-   - Missing secrets: Verify all required secrets are set
-   - SSH connection failed: Check `SERVER_USER`, `SERVER_HOST`, and SSH key
+   - **Host key verification failed**: The workflow adds the server to `known_hosts` via `ssh-keyscan`. Ensure the "Set up SSH" and "Add server to known hosts" steps run before any `ssh`/`scp` commands. If you still see this, confirm `SSH_PRIVATE_KEY` is set and contains the full private key (including `-----BEGIN ... KEY-----` and `-----END ... KEY-----`).
+   - Missing secrets: Verify all required secrets are set (including `SSH_PRIVATE_KEY`)
+   - SSH connection failed: Check `SERVER_USER`, `SERVER_HOST`, and that the public key is in the server's `~/.ssh/authorized_keys`
    - Docker login failed: Check `GITHUB_TOKEN` (automatically provided)
    - Build failed: Check Dockerfile and build logs
 
@@ -217,6 +218,7 @@ Use different `PROJECT_DIR` for each project:
 ## Required Secrets Summary
 
 **Minimum required secrets**:
+- `SSH_PRIVATE_KEY` (private key for SSH access to server)
 - `SERVER_USER`
 - `SERVER_HOST`
 - `PROJECT_DIR`
