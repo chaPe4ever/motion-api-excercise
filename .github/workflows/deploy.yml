@@ -41,8 +41,8 @@ jobs:
       - name: Build and push backend image
         uses: docker/build-push-action@v5
         with:
-          context: ./motion-api-excercise
-          file: ./motion-api-excercise/Dockerfile
+          context: .
+          file: ./Dockerfile
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ steps.set-repo.outputs.repo_lower }}/backend:${{ env.IMAGE_TAG }}
@@ -68,9 +68,9 @@ jobs:
       - name: Copy files to server
         run: |
           ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "mkdir -p ${{ secrets.PROJECT_DIR }}/nginx/sites-available ${{ secrets.PROJECT_DIR }}/scripts"
-          scp motion-api-excercise/docker-compose.prod.yml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.PROJECT_DIR }}/
-          scp motion-api-excercise/scripts/*.sh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.PROJECT_DIR }}/scripts/ || true
-          scp motion-api-excercise/nginx/sites-available/* ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.PROJECT_DIR }}/nginx/sites-available/ || true
+          scp docker-compose.prod.yml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.PROJECT_DIR }}/
+          scp scripts/*.sh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.PROJECT_DIR }}/scripts/ || true
+          scp nginx/sites-available/* ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.PROJECT_DIR }}/nginx/sites-available/ || true
 
       - name: Deploy to server
         env:
