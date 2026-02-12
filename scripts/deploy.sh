@@ -107,20 +107,11 @@ cd "$PROJECT_DIR"
 
 if [ -f "scripts/setup-host-nginx-auto.sh" ] && [ -d "nginx/sites-available" ]; then
   export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-motion-api}"
-  # Create wrapper script to pass env vars (sudo doesn't preserve env by default)
-  cat > /tmp/nginx-setup-wrapper.sh << 'WRAPPER_EOF'
-#!/bin/bash
-export PROJECT_DIR="$1"
-export ALLOWED_HOSTS="$2"
-export COMPOSE_PROJECT_NAME="$3"
-bash "$PROJECT_DIR/scripts/setup-host-nginx-auto.sh"
-WRAPPER_EOF
-  chmod +x /tmp/nginx-setup-wrapper.sh
-  sudo /tmp/nginx-setup-wrapper.sh "$PROJECT_DIR" "$ALLOWED_HOSTS" "${COMPOSE_PROJECT_NAME:-motion-api}" || {
+  # Run host nginx setup with args (sudo doesn't preserve env; script accepts PROJECT_DIR ALLOWED_HOSTS COMPOSE_PROJECT_NAME)
+  sudo /bin/bash "$PROJECT_DIR/scripts/setup-host-nginx-auto.sh" "$PROJECT_DIR" "$ALLOWED_HOSTS" "${COMPOSE_PROJECT_NAME:-motion-api}" || {
     echo "⚠️  Host nginx setup failed."
-    echo "   Run one-time server setup: see SERVER_SETUP.md (sudo NOPASSWD for setup script)."
+    echo "   On the server, add NOPASSWD for the setup script. See GITHUB_SETUP.md → Server sudoers for SSL."
   }
-  rm -f /tmp/nginx-setup-wrapper.sh
 else
   echo "⚠️  setup-host-nginx-auto.sh or nginx templates not found"
 fi
@@ -149,17 +140,8 @@ else
     --non-interactive 2>&1; then
     echo "✅ SSL certificate obtained successfully!"
     SSL_CERTS_EXIST=true
-    # Re-run host nginx setup to copy certs and enable HTTPS
-    cat > /tmp/nginx-setup-wrapper.sh << 'WRAPPER_EOF'
-#!/bin/bash
-export PROJECT_DIR="$1"
-export ALLOWED_HOSTS="$2"
-export COMPOSE_PROJECT_NAME="$3"
-bash "$PROJECT_DIR/scripts/setup-host-nginx-auto.sh"
-WRAPPER_EOF
-    chmod +x /tmp/nginx-setup-wrapper.sh
-    sudo /tmp/nginx-setup-wrapper.sh "$PROJECT_DIR" "$ALLOWED_HOSTS" "${COMPOSE_PROJECT_NAME:-motion-api}" || true
-    rm -f /tmp/nginx-setup-wrapper.sh
+    # Re-run host nginx setup to copy certs from Docker volume to host and enable HTTPS block
+    sudo /bin/bash "$PROJECT_DIR/scripts/setup-host-nginx-auto.sh" "$PROJECT_DIR" "$ALLOWED_HOSTS" "${COMPOSE_PROJECT_NAME:-motion-api}" || true
   else
     echo "⚠️  SSL certificate setup failed or skipped"
     echo "   Ensure host nginx is set up (see SERVER_SETUP.md) and port 80 is open."

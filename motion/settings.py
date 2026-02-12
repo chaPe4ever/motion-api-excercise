@@ -20,6 +20,11 @@ ALLOWED_HOSTS = [host.strip() for host in _allowed_hosts_str.split(",") if host.
 # Add localhost for development when DEBUG is True
 if DEBUG and not ALLOWED_HOSTS:
     ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0"]
+# In production, allow localhost/127.0.0.1 for in-container healthchecks
+if not DEBUG and ALLOWED_HOSTS:
+    for h in ("localhost", "127.0.0.1"):
+        if h not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS = list(ALLOWED_HOSTS) + [h]
 
 # Security headers (only enabled in production with HTTPS)
 if DEBUG:
@@ -31,8 +36,8 @@ if DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = False
     SECURE_HSTS_PRELOAD = False
 else:
-    # Production: Enable HTTPS security settings
-    SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=True, cast=bool)
+    # Production: Enable HTTPS when SSL is configured (set SECURE_SSL_REDIRECT=true after certbot)
+    SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=False, cast=bool)
     SESSION_COOKIE_SECURE = config("SESSION_COOKIE_SECURE", default=True, cast=bool)
     CSRF_COOKIE_SECURE = config("CSRF_COOKIE_SECURE", default=True, cast=bool)
     SECURE_BROWSER_XSS_FILTER = True

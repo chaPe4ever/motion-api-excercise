@@ -4,12 +4,20 @@ set -e
 # Automated host-level nginx setup script for motion-api
 # Processes template files and sets up nginx server blocks
 # Copies SSL certificates from Docker volumes to host
+#
+# Can be run via sudo with arguments (for CI, no TTY):
+#   sudo /bin/bash /path/to/setup-host-nginx-auto.sh PROJECT_DIR ALLOWED_HOSTS COMPOSE_PROJECT_NAME
 
 # Check if running as root or with sudo
-if [ "$EUID" -ne 0 ]; then 
+if [ "$EUID" -ne 0 ]; then
   echo "❌ This script must be run as root or with sudo"
   exit 1
 fi
+
+# Accept arguments so sudo can be used without a wrapper (CI has no TTY)
+if [ -n "$1" ]; then export PROJECT_DIR="$1"; fi
+if [ -n "$2" ]; then export ALLOWED_HOSTS="$2"; fi
+if [ -n "$3" ]; then export COMPOSE_PROJECT_NAME="$3"; fi
 
 # Get domain from environment variables
 MOTION_API_DOMAIN="${ALLOWED_HOSTS%% *}"
@@ -48,7 +56,9 @@ if ! grep -q "server_names_hash_bucket_size" /etc/nginx/nginx.conf; then
 fi
 
 # Get the project directory (where templates are located)
-PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+if [ -z "$PROJECT_DIR" ]; then
+  PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+fi
 TEMPLATE_DIR="$PROJECT_DIR/nginx/sites-available"
 
 # Check if template directory exists
@@ -85,8 +95,10 @@ if [ "$SSL_CERTS_EXIST" = true ] && [ -n "$CERTBOT_VOLUME_NAME" ]; then
     -v /etc/letsencrypt:/target \
     alpine sh -c "
       if [ -f /source/live/$MOTION_API_DOMAIN/fullchain.pem ]; then
-        cp -r /source/live/$MOTION_API_DOMAIN/* /target/live/$MOTION_API_DOMAIN/ 2>/dev/null || true
-        cp -r /source/archive/$MOTION_API_DOMAIN/* /target/archive/$MOTION_API_DOMAIN/ 2>/dev/null || true
+        rm -rf /target/live/$MOTION_API_DOMAIN /target/archive/$MOTION_API_DOMAIN
+        mkdir -p /target/live/$MOTION_API_DOMAIN /target/archive/$MOTION_API_DOMAIN
+        cp -r /source/archive/$MOTION_API_DOMAIN/* /target/archive/$MOTION_API_DOMAIN/
+        cp -r /source/live/$MOTION_API_DOMAIN/* /target/live/$MOTION_API_DOMAIN/
         echo '✅ Certificates copied to host'
       fi
     " || echo "⚠️  Could not copy certificates (may need manual setup)"
@@ -104,9 +116,9 @@ if [ -f "$TEMPLATE_DIR/motion-api" ]; then
     # Remove the HTTPS server block (from "# HTTPS server" line to the closing "}")
     sed -i '/^# HTTPS server/,/^}$/d' /tmp/motion-api-nginx.conf
   else
-    # Certificates exist - ensure SSL paths are correct
-    sed -i "s|ssl_certificate.*|ssl_certificate /etc/letsencrypt/live/$MOTION_API_DOMAIN/fullchain.pem;|g" /tmp/motion-api-nginx.conf
-    sed -i "s|ssl_certificate_key.*|ssl_certificate_key /etc/letsencrypt/live/$MOTION_API_DOMAIN/privkey.pem;|g" /tmp/motion-api-nginx.conf
+    # Certificates exist - ensure SSL paths are correct (key first: "ssl_certificate" would match key line too)
+    sed -i "s|ssl_certificate_key .*|ssl_certificate_key /etc/letsencrypt/live/$MOTION_API_DOMAIN/privkey.pem;|g" /tmp/motion-api-nginx.conf
+    sed -i "s|ssl_certificate /etc/.*|ssl_certificate /etc/letsencrypt/live/$MOTION_API_DOMAIN/fullchain.pem;|g" /tmp/motion-api-nginx.conf
   fi
   
   mv /tmp/motion-api-nginx.conf /etc/nginx/sites-available/motion-api

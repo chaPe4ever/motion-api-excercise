@@ -11,16 +11,22 @@ This guide explains how to configure GitHub Actions and secrets for automated de
 
 ## One-Time Server Setup (Required)
 
-Before the first deployment (or if you see "sudo: a terminal is required" or "Host key verification failed"), run the one-time steps in **[SERVER_SETUP.md](./SERVER_SETUP.md)** on your server. In short:
+Before the first deployment (or if you see **"sudo: a terminal is required"** or "Host nginx setup failed"), run this **one-time step on your server** so the deploy can set up nginx and SSL without a password:
 
-1. **Allow passwordless sudo for the nginx setup script** (so GitHub Actions can run it):
+1. **Server sudoers for SSL (required for HTTPS)**  
+   SSH into the server, then:
    ```bash
    sudo visudo
    ```
-   Add (replace path with your actual `PROJECT_DIR`):
+   Add **exactly one** of these lines (use the path that matches your `PROJECT_DIR` secret). The `*` at the end allows the script to receive arguments (required for CI):
    ```
-   runner ALL=(ALL) NOPASSWD: /bin/bash /home/runner/app/motion-api/scripts/setup-host-nginx-auto.sh
+   runner ALL=(ALL) NOPASSWD: /bin/bash /home/runner/motion-api/scripts/setup-host-nginx-auto.sh *
    ```
+   If your project lives elsewhere (e.g. `/home/runner/app`), use that path instead:
+   ```
+   runner ALL=(ALL) NOPASSWD: /bin/bash /home/runner/app/scripts/setup-host-nginx-auto.sh *
+   ```
+   Replace `runner` with your actual `SERVER_USER` if different. Save and exit. After the next deploy, host nginx will run with sudo (no TTY), certs will be copied to the host, and HTTPS will work.
 
 2. If collectstatic already failed once, fix volume permissions:
    ```bash

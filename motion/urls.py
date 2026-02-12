@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.http import HttpResponse
 from django.urls import include, path, re_path
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
@@ -35,6 +36,7 @@ That's it! The token will be automatically added to all requests.
 )
 
 urlpatterns = [
+    path("health/", lambda r: HttpResponse("ok", content_type="text/plain")),
     path("admin/", admin.site.urls),
     path("backend/api/users/", include("user.urls")),
     path(
