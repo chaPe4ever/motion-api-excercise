@@ -45,7 +45,7 @@ Add the following secrets:
 | Secret Name | Description | Example |
 |------------|-------------|---------|
 | `SERVER_USER` | SSH username for your server | `runner` or `ubuntu` |
-| `SERVER_HOST` | Server IP address or hostname | `165.227.158.61` |
+| `SERVER_HOST` | Server IP address or hostname | `165.227.158.51` |
 | `PROJECT_DIR` | Directory on server where project will be deployed | `/home/runner/app/motion-api` |
 
 **Note**: Use a different `PROJECT_DIR` than plannr if deploying both projects on the same server.
