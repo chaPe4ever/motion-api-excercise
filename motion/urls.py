@@ -1,3 +1,6 @@
+import os
+
+from django.conf import settings
 from django.contrib import admin
 from django.http import HttpResponse
 from django.urls import include, path, re_path
@@ -5,6 +8,19 @@ from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 from rest_framework_simplejwt import views as jwt_views
+
+# Determine the base URL for Swagger schema
+# In production, use HTTPS; in development, auto-detect
+schema_url = None
+if not settings.DEBUG:
+    # In production, construct HTTPS URL from ALLOWED_HOSTS
+    allowed_hosts = os.environ.get("ALLOWED_HOSTS", "").split(",")
+    if allowed_hosts and allowed_hosts[0].strip():
+        domain = allowed_hosts[0].strip()
+        # Remove http:// or https:// if present
+        domain = domain.replace("http://", "").replace("https://", "").split("/")[0].split(":")[0]
+        if domain:
+            schema_url = f"https://{domain}"
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -33,6 +49,7 @@ That's it! The token will be automatically added to all requests.
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
+    url=schema_url,  # Use HTTPS in production, auto-detect in development
 )
 
 urlpatterns = [
