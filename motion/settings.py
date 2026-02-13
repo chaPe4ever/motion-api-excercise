@@ -113,7 +113,13 @@ if _database_url:
     if db_config.get("ENGINE") == "django.db.backends.postgresql":
         # Configure SSL for PostgreSQL connections
         options: Dict[str, Any] = db_config.get("OPTIONS", {}) or {}
-        options["sslmode"] = "require"
+        # Only require SSL in production (local Docker doesn't support SSL)
+        # In development, use prefer (will use SSL if available, but won't fail if not)
+        if not DEBUG:
+            options["sslmode"] = "require"
+        elif "sslmode" not in options:
+            # In development, prefer SSL but don't require it
+            options["sslmode"] = "prefer"
 
         # Use PostgreSQL schema to isolate this project's tables when sharing a database
         # Set DB_SCHEMA environment variable (default: "test")

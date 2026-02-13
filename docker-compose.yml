@@ -1,0 +1,53 @@
+name: motion-api-local
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-motion_db}
+      - POSTGRES_USER=${POSTGRES_USER:-motion_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-motion_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"  # Exposed for local access
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-motion_user} -d ${POSTGRES_DB:-motion_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Use Django runserver for local development (auto-reload on code changes)
+    # Override CMD to use runserver instead of gunicorn
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app  # Mount current directory for live code editing
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    # Run as root for local dev to avoid permission issues with mounted volumes
+    user: root
+    ports:
+      - "8000:8000"  # Exposed for local access
+    environment:
+      - DEBUG=1
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+      # Explicitly set local database URL (overrides .env file)
+      # Use sslmode=prefer for local Docker (SSL not required, but will use if available)
+      - DATABASE_URL=postgresql://motion_user:motion_password@db:5432/motion_db?sslmode=prefer
+      - DB_SCHEMA=  # Empty string = use default public schema
+      - SECURE_SSL_REDIRECT=false
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
